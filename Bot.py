@@ -53,9 +53,7 @@ def login(Session, NID, PASS):
 
 def course_find(Session, Sign_In, CourseID):
     soup = BeautifulSoup(Sign_In.text, 'html.parser')
-    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm',
-                                                                                          'method': 'post'}).get(
-        'action')
+    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm', 'method': 'post'}).get('action')
     payload = {'ctl00_ToolkitScriptManager1_HiddenField': '',
                'ctl00_MainContent_TabContainer1_ClientState': '{\"ActiveTabIndex\":2,\"TabState\":[true,true,true]}',
                '__EVENTTARGET': '',
@@ -85,9 +83,7 @@ def course_find(Session, Sign_In, CourseID):
 
 def course_check(Session, Sign_In, Find):
     soup = BeautifulSoup(Find.text, 'html.parser')
-    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm',
-                                                                                          'method': 'post'}).get(
-        'action')
+    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm', 'method': 'post'}).get('action')
     payload = {'ctl00_ToolkitScriptManager1_HiddenField': '',
                'ctl00_MainContent_TabContainer1_ClientState': '{\"ActiveTabIndex\":2,\"TabState\":[true,true,true]}',
                '__EVENTTARGET': 'ctl00$MainContent$TabContainer1$tabSelected$gvToAdd',
@@ -151,29 +147,38 @@ def get_people(input_string):
 
 
 if __name__ == '__main__':
-    session = requests.session()
-    flag, sign_in = login(session, Username, Password)
-    if not flag:
-        print('*** Login failed...')
-        sys.exit(0)
-    else:
-        # print(sign_in.text)
-        print('*** Login Success ***')
-        while len(Course) > 0:
-            for each in Course:
-                find = course_find(session, sign_in, each)
-                check = course_check(session, sign_in, find)
-                current_p, max_p = get_people(check.text)
-                print('Course: ', each, ' -- ', 'Current: ', current_p, ' / ', 'Max: ', max_p, '', sep='')
-                if int(current_p) < int(max_p):
-                    print('Course: ', each, ' -- ', 'Adding', sep='')
-                    result = course_add(session, sign_in, check)
-                    if result.text.__contains__('科目重覆'):
-                        print('Course: ', each, ' -- ', 'Success', sep='')
+    try:
+        session = requests.session()
+        flag, sign_in = login(session, Username, Password)
+        if not flag:
+            print('*** Login failed...')
+            sys.exit(0)
+        else:
+            print('*** Login Success ***')
+            while len(Course) > 0:
+                for each in Course:
+                    try:
+                        find = course_find(session, sign_in, each)
+                        check = course_check(session, sign_in, find)
+                        current_p, max_p = get_people(check.text)
+                        print('Course: ', each, ' -- ', 'Current: ', current_p, ' / ', 'Max: ', max_p, '', sep='')
+                        if int(current_p) < int(max_p):
+                            print('Course: ', each, ' -- ', 'Adding', sep='')
+                            result = course_add(session, sign_in, check)
+                            if result.text.__contains__('加選成功'):
+                                print('Course: ', each, ' -- ', 'Success', sep='')
+                                Course.remove(each)
+                            elif result.text.__contains__('科目重覆'):
+                                print('Course: ', each, ' -- ', 'Repeated', sep='')
+                                Course.remove(each)
+                            else:
+                                print('Course: ', each, ' -- ', 'Failed', sep='')
+                        else:
+                            print('Full')
+                    except AttributeError:
+                        print('Course: ', each, ' -- ', 'Already added', sep='')
                         Course.remove(each)
-                    else:
-                        print('Course: ', each, ' -- ', 'Failed', sep='')
-                else:
-                    print('Full')
-                time.sleep(2)
-    print('End...')
+                    time.sleep(1)
+        print('End...')
+    except Exception:
+        print('Error.')
