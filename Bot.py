@@ -1,9 +1,10 @@
 import sys
 import requests
+import re
 import time
 from bs4 import BeautifulSoup
 
-from NID import NID, PASS
+from NID import Username, Password, Course
 
 code_url = 'https://course.fcu.edu.tw/validateCode.aspx'
 login_url = 'https://course.fcu.edu.tw/Login.aspx'
@@ -11,16 +12,12 @@ login_url = 'https://course.fcu.edu.tw/Login.aspx'
 loginFind_payload = ['__EVENTARGUMENT', '__LASTFOCUS', '__VIEWSTATE', '__VIEWSTATEGENERATOR',
                      '__EVENTVALIDATION']
 
-commonFind_payload = ['ctl00_ToolkitScriptManager1_HiddenField', 'ctl00_MainContent_TabContainer1_ClientState',
-                      '__LASTFOCUS', 'ctl00_MainContent_TabContainer1_tabSelected_TabContainer2_ClientState',
-                      '__VIEWSTATE', '__VIEWSTATEGENERATOR', '__EVENTVALIDATION', '__EVENTARGUMENT']
-
 header = {
     'Connection': 'Keep-Alive',
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-    'Accept-Encoding': 'gzip, deflate, sdch',
-    'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.6,en;q=0.4',
-    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_12_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Encoding': 'gzip, deflate',
+    'Accept-Language': 'zh-TW,zh;q=0.8,en-US;q=0.5,en;q=0.3',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:57.0) Gecko/20100101 Firefox/57.0'
 }
 
 
@@ -54,43 +51,129 @@ def login(Session, NID, PASS):
     return flag, signin
 
 
-def get_common_payload(Sign_In, CourseID):
+def course_find(Session, Sign_In, CourseID):
     soup = BeautifulSoup(Sign_In.text, 'html.parser')
-    payload = dict()
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDegree'] = '1'
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDept'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlUnit'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlClass'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$cbOtherCondition1'] = 'on'
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbSubID'] = CourseID
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlWeek'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlPeriod'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbCourseName'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbTeacherName'] = ''
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlSpecificSubjects'] = '1'
-    payload['ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$cbShowSelected'] = 'on'
-    for each in commonFind_payload:
-        try:
-            payload[each] = soup.find('input', {'id': each}).get('value')
-        except AttributeError:
-            payload[each] = ''
-    return payload
+    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm',
+                                                                                          'method': 'post'}).get(
+        'action')
+    payload = {'ctl00_ToolkitScriptManager1_HiddenField': '',
+               'ctl00_MainContent_TabContainer1_ClientState': '{\"ActiveTabIndex\":2,\"TabState\":[true,true,true]}',
+               '__EVENTTARGET': '',
+               '__EVENTARGUMENT': '',
+               '__LASTFOCUS': '',
+               'ctl00_MainContent_TabContainer1_tabSelected_TabContainer2_ClientState': '{\"ActiveTabIndex\":0,\"TabState\":[true,true,true]}',
+               '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'}).get('value'),
+               '__VIEWSTATEGENERATOR': soup.find('input', {'id': '__VIEWSTATEGENERATOR'}).get('value'),
+               '__EVENTVALIDATION': soup.find('input', {'id': '__EVENTVALIDATION'}).get('value'),
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDegree': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDept': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlUnit': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlClass': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbSubID': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlWeek': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlPeriod': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbCourseName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbTeacherName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlSpecificSubjects': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$cbShowSelected': 'on',
+               'ctl00$MainContent$TabContainer1$tabSelected$tbSubID': CourseID,
+               'ctl00$MainContent$TabContainer1$tabSelected$btnGetSub': '查詢',
+               'ctl00$MainContent$TabContainer1$tabSelected$cpeWishList_ClientState': 'false'}
+    result = Session.post(url, headers=header, data=payload)
+    return result
 
 
-def check_course(Session, Sign_In, CourseID):
-    soup = BeautifulSoup(Sign_In.text, 'html.parser')
-    URL = 'http://service111.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm', 'method': 'post'}).get('action')
-    payload = get_common_payload(Sign_In, CourseID)
-    payload['__EVENTTARGET'] = soup.find('input', {'value': '登記人數'}).get('id')
-    sign_in = Session.post(URL, headers=header, data=payload)
-    return sign_in
+def course_check(Session, Sign_In, Find):
+    soup = BeautifulSoup(Find.text, 'html.parser')
+    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm',
+                                                                                          'method': 'post'}).get(
+        'action')
+    payload = {'ctl00_ToolkitScriptManager1_HiddenField': '',
+               'ctl00_MainContent_TabContainer1_ClientState': '{\"ActiveTabIndex\":2,\"TabState\":[true,true,true]}',
+               '__EVENTTARGET': 'ctl00$MainContent$TabContainer1$tabSelected$gvToAdd',
+               '__EVENTARGUMENT': 'selquota$0',
+               '__LASTFOCUS': '',
+               'ctl00_MainContent_TabContainer1_tabSelected_TabContainer2_ClientState': '{\"ActiveTabIndex\":0,\"TabState\":[true,true,true]}',
+               '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'}).get('value'),
+               '__VIEWSTATEGENERATOR': soup.find('input', {'id': '__VIEWSTATEGENERATOR'}).get('value'),
+               '__EVENTVALIDATION': soup.find('input', {'id': '__EVENTVALIDATION'}).get('value'),
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDegree': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDept': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlUnit': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlClass': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbSubID': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlWeek': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlPeriod': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbCourseName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbTeacherName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlSpecificSubjects': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$cbShowSelected': 'on'
+               }
+    result = Session.post(url, headers=header, data=payload)
+    return result
+
+
+def course_add(Session, Sign_In, Check):
+    soup = BeautifulSoup(Check.text, 'html.parser')
+    url = 'http://service' + Sign_In.url[14:17] + '.sds.fcu.edu.tw/' + soup.find('form', {'id': 'aspnetForm',
+                                                                                          'method': 'post'}).get(
+        'action')
+    payload = {'ctl00_ToolkitScriptManager1_HiddenField': '',
+               'ctl00_MainContent_TabContainer1_ClientState': '{\"ActiveTabIndex\":2,\"TabState\":[true,true,true]}',
+               '__EVENTTARGET': 'ctl00$MainContent$TabContainer1$tabSelected$gvToAdd',
+               '__EVENTARGUMENT': 'addCourse$0',
+               '__LASTFOCUS': '',
+               'ctl00_MainContent_TabContainer1_tabSelected_TabContainer2_ClientState': '{\"ActiveTabIndex\":0,\"TabState\":[true,true,true]}',
+               '__VIEWSTATE': soup.find('input', {'id': '__VIEWSTATE'}).get('value'),
+               '__VIEWSTATEGENERATOR': soup.find('input', {'id': '__VIEWSTATEGENERATOR'}).get('value'),
+               '__EVENTVALIDATION': soup.find('input', {'id': '__EVENTVALIDATION'}).get('value'),
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDegree': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlDept': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlUnit': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlClass': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbSubID': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlWeek': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlPeriod': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbCourseName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$tbTeacherName': '',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$ddlSpecificSubjects': '1',
+               'ctl00$MainContent$TabContainer1$tabCourseSearch$wcCourseSearch$cbShowSelected': 'on'
+               }
+    result = Session.post(url, headers=header, data=payload)
+    return result
+
+
+def get_people(input_string):
+    people = re.match(r'(\d+)\D*(\d+)', re.search(r'(?<=alert\(\'已登記人數 / 開放人數：).*(?=\'\))', input_string).group())
+    current_p = people.group(1)
+    max_p = people.group(2)
+    return current_p, max_p
 
 
 if __name__ == '__main__':
     session = requests.session()
-    flag, sign_in = login(session, NID, PASS)
+    flag, sign_in = login(session, Username, Password)
     if not flag:
         print('*** Login failed...')
         sys.exit(0)
     else:
-        print('*** Login Success')
+        # print(sign_in.text)
+        print('*** Login Success ***')
+        while len(Course) > 0:
+            for each in Course:
+                find = course_find(session, sign_in, each)
+                check = course_check(session, sign_in, find)
+                current_p, max_p = get_people(check.text)
+                print('Course: ', each, ' -- ', 'Current: ', current_p, ' / ', 'Max: ', max_p, '', sep='')
+                if int(current_p) < int(max_p):
+                    print('Course: ', each, ' -- ', 'Adding', sep='')
+                    result = course_add(session, sign_in, check)
+                    if result.text.__contains__('科目重覆'):
+                        print('Course: ', each, ' -- ', 'Success', sep='')
+                        Course.remove(each)
+                    else:
+                        print('Course: ', each, ' -- ', 'Failed', sep='')
+                else:
+                    print('Full')
+                time.sleep(2)
+    print('End...')
