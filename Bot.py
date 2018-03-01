@@ -140,7 +140,7 @@ def course_add(Session, Sign_In, Check):
 
 
 def get_people(input_string):
-    people = re.match(r'(\d+)\D*(\d+)', re.search(r'(?<=alert\(\'已登記人數 / 開放人數：).*(?=\'\))', input_string).group())
+    people = re.match(r'(\d+)\D*(\d+)', re.search(r'(?<=alert\(\'剩餘名額/開放名額：).*(?=\'\))', input_string).group())
     current_p = people.group(1)
     max_p = people.group(2)
     return current_p, max_p
