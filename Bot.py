@@ -171,6 +171,9 @@ if __name__ == '__main__':
                             elif result.text.__contains__('科目重覆'):
                                 print('Course: ', each, ' -- ', 'Repeated', sep='')
                                 Course.remove(each)
+                            elif result.text.__contains__('已修過2次的體育課'):
+                                print('You have already finished PE class ', sep='')
+                                Course.remove(each)
                             else:
                                 print('Course: ', each, ' -- ', 'Failed', sep='')
                         else:
