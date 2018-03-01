@@ -162,7 +162,7 @@ if __name__ == '__main__':
                         check = course_check(session, sign_in, find)
                         current_p, max_p = get_people(check.text)
                         print('Course: ', each, ' -- ', 'Current: ', current_p, ' / ', 'Max: ', max_p, '', sep='')
-                        if int(current_p) < int(max_p):
+                        if int(current_p) > 0:
                             print('Course: ', each, ' -- ', 'Adding', sep='')
                             result = course_add(session, sign_in, check)
                             if result.text.__contains__('加選成功'):
